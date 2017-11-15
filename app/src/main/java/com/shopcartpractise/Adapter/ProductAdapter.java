@@ -60,12 +60,12 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.MyProduc
         });
 
 
-//        holder.delete.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//
-//            }
-//        });
+        holder.delete.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                clickDelete.clickDelete(position);
+            }
+        });
         holder.nASV.setValue(productNum);
         holder.nASV.setOnButtonClickListenter(new NumAddSubView.OnButtonClickListenter() {
             @Override

@@ -17,7 +17,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements ProductAdapter.ClickCheckBox, View.OnClickListener {
+public class MainActivity extends AppCompatActivity implements ProductAdapter.ClickCheckBox, View.OnClickListener, ProductAdapter.ClickDelete {
 
     private RecyclerView mRecycleView;
     private TextView  AllPriceTV;
@@ -47,7 +47,6 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.Cl
         products = new ArrayList<>();
         for (int i=0;i<5;i++){
             ProductInfo product=new ProductInfo("商品"+i,"55.4",false);
-            product.setProductNum(1);
             product.setProductNum(0);
             products.add(product);
         }
@@ -55,6 +54,7 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.Cl
         adapter = new ProductAdapter(products,this);
         mRecycleView.setAdapter(adapter);
         adapter.setClickCheckBox(this);
+        adapter.setClickDelete(this);
 
     }
 
@@ -80,50 +80,64 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.Cl
      */
     @Override
     public void clickCheckBox(int positon,boolean selected) {
-        mSelectedNum=0;
-        zongjia=0;
+        //清空总价，总件数
+        ClearMethod();
         //判断点击的多选框是否选中
         //选中，将当前点击的多选框位置，保存起来，并将所对应的商品设置为true
         if (selected) {
+            //将选中的商品地址保存起来
             mPositons.add(positon);
+            //将选中的商品设置为选中装态
             ProductInfo productInfo = products.get(positon);
             productInfo.setSelected(true);
         }else {
             //不选中，遍历位置集合
             for (int i=0 ; i<mPositons.size();i++){
+                //取出选中的商品位置
                 int cPosition = mPositons.get(i);
+                //判断商品位置是否与当前选中的商品位置相等
+                //如果相等，就把位置移除
                 if (cPosition==positon) {
                     mPositons.remove(i);
+                    //并将商品设置为不选中装态
                     ProductInfo productInfo = products.get(positon);
                     productInfo.setSelected(false);
                 }
             }
+
         }
-        for (int i=0;i<products.size(); i++) {
-            ProductInfo product = products.get(i);
-            boolean pSelected = product.isSelected();
-            if (pSelected) {
-                mSelectedNum+=product.getProductNum();
-                zongjia+=product.getProductNum()*Float.parseFloat(product.getProductPrice());
-            }
-        }
+
+        //遍历商品集合,计算总价 和总件数
+        JsAllPriceAllNumber();
+        //判断位置集合的个数是否等于商品集合的商品件数
         if (mPositons.size()==products.size()) {
             QuanXuanCB.setChecked(true);
         }else {
             QuanXuanCB.setChecked(false);
         }
         ProductNumTV.setText(""+mSelectedNum);
+        //将商品总价转换为保留两位小数的值
         String s = takeLengthTwo(zongjia);
         AllPriceTV.setText(s+"￥");
+    }
+//清空总价，总件数
+    private void ClearMethod() {
+        mSelectedNum=0;
+        zongjia=0;
     }
 
     @SuppressLint("LongLogTag")
     @Override
     public void clickSubAddBut(int position, int value, boolean isAdd,float price) {
+        //更新点击的商品的件数
         products.get(position).setProductNum(value);
+        //遍历商品集合
         for (int i=0;i<products.size();i++){
             ProductInfo product = products.get(i);
             boolean pSelected = product.isSelected();
+            //判断商品是否选中
+            //如果选中，判断点击的商品是否等于选中的商品，如果等于，
+            //在判断，当前是否点击了加按钮 还是减按钮
             if (pSelected) {
                 if (i==position) {
                 if (isAdd) {
@@ -137,11 +151,9 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.Cl
                         Log.i(TAG, "clickSubAddBut2: pSelected:"+pSelected+";isAdd"+isAdd+";mSelectedNum:"+mSelectedNum+";zongjia:"+zongjia);
                     }
 
-
                 }
                 }
             }
-
         }
         ProductNumTV.setText(""+mSelectedNum);
         String s = takeLengthTwo(zongjia);
@@ -154,40 +166,19 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.Cl
         int id = view.getId();
         switch (id){
             case R.id.QX:
-                zongjia=0;
-                mSelectedNum=0;
+                //清空总件数，总价
+               ClearMethod();
+                //清空位置集合
                 mPositons.clear();
                 //获取到全选多选框的选中状态
                 boolean checked = QuanXuanCB.isChecked();
                 isAllSelected=checked;
                 if (isAllSelected) {
-                    for (int i=0;i<products.size();i++) {
-                        ProductInfo productInfo = products.get(i);
-                        productInfo.setSelected(true);
-                        mPositons.add(i);
-                    }
-                    isAllSelected=false;
-                    QuanXuanCB.setChecked(true);
-                    for (ProductInfo product : products) {
-                        boolean selected = product.isSelected();
-                        int productNum = product.getProductNum();
-                        float price = Float.parseFloat(product.getProductPrice());
-                        if (selected) {
-                            zongjia+=productNum*price;
-                            mSelectedNum+=productNum;
-                        }
-                    }
-                    ProductNumTV.setText(mSelectedNum+"");
-                    //将总价转换为保留两位小数的String类型
-                    String s = takeLengthTwo(zongjia);
-                    AllPriceTV.setText(s+"￥");
+                   SetSelectState(true);
+                    //计算总价和总选中的件数
+                    JsAllPriceAllNumber();
                 }else {
-                    for (ProductInfo product : products) {
-                        product.setSelected(false);
-                    }
-                    isAllSelected=true;
-                    QuanXuanCB.setChecked(false);
-
+                    SetSelectState(false);
                     //将总价转换为保留两位小数的String类型
                     String s = takeLengthTwo(zongjia);
                     AllPriceTV.setText(s+"￥");
@@ -198,9 +189,73 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.Cl
                 break;
         }
     }
+//设置选中的状态
+    private void SetSelectState(boolean selected) {
+        for (ProductInfo product : products) {
+            product.setSelected(selected);
+        }
+        if (selected) {
+            isAllSelected=false;
+        }else {
+            isAllSelected=true;
+        }
+        QuanXuanCB.setChecked(selected);
+    }
+
+    /**
+     * 转换为保留两位小数的值
+     * @param price
+     * @return
+     */
     public String takeLengthTwo(Float price){
         DecimalFormat format=new DecimalFormat("0.00");
         String result = format.format(price);
         return result;
+    }
+
+    @SuppressLint("LongLogTag")
+    @Override
+    public void clickDelete(int positon) {
+        //清空总件数，总价
+         ClearMethod();
+        Log.i(TAG, "clickDelete:position: "+positon);
+        products.remove(positon);
+        //清空位置位置集合
+        mPositons.clear();
+        //循环遍历，将选中的商品的位置添加到位置集合中
+        for (int i=0;i<products.size();i++){
+            ProductInfo productInfo = products.get(i);
+            boolean selected = productInfo.isSelected();
+            if (selected) {
+                mPositons.add(i);
+            }
+        }
+        if ( mPositons.size()<=0){
+            QuanXuanCB.setChecked(false);
+        }
+
+        //计算总价和总选中的件数
+        JsAllPriceAllNumber();
+        //刷新数据
+        adapter.notifyDataSetChanged();
+
+
+    }
+//计算总价和总件数
+    private void JsAllPriceAllNumber() {
+        for (ProductInfo product : products) {
+            boolean selected = product.isSelected();
+            int productNum = product.getProductNum();
+            String productPrice = product.getProductPrice();
+            float price = Float.parseFloat(productPrice);
+            if (selected) {
+                zongjia+=productNum*price;
+                mSelectedNum+=productNum;
+            }
+        }
+        //将总价转换为保留两位小数的String类型
+        String s = takeLengthTwo(zongjia);
+        AllPriceTV.setText(s+"￥");
+        ProductNumTV.setText(mSelectedNum+"");
     }
 }
